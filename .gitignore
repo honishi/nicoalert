@@ -1,0 +1,7 @@
+venv
+*.pyc
+log/*.log
+nicoalert.config*
+!nicoalert.config.sample
+nicoalert.env*
+!nicoalert.env.sample

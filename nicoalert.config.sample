@@ -1,0 +1,34 @@
+[nicoalert]
+mail = sample@example.com
+password = mypassword
+# comma separated community list
+target_communities = co12345
+
+[twitter]
+consumer_key = xxx
+consumer_secret = xxx
+access_key = xxx
+access_secret = xxx
+
+[loggers]
+keys=root
+
+[logger_root]
+level=NOTSET
+handlers=default
+
+[handlers]
+keys=default
+
+[handler_default]
+class=StreamHandler
+level=NOTSET
+formatter=default
+args=(sys.stdout,)
+
+[formatters]
+keys=default
+
+[formatter_default]
+format=[%(asctime)s] [%(levelname)s] %(message)s
+datefmt=
