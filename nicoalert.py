@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# http://d.hatena.ne.jp/miettal/20111229/1325175229
+# reference; http://d.hatena.ne.jp/miettal/20111229/1325175229
 
 import os
 import ConfigParser
@@ -16,7 +16,7 @@ from lxml import etree
 
 import tweepy
 
-nicoalert_config = os.path.dirname(os.path.abspath(__file__)) + '/nicoalert.config'
+NICOALERT_CONFIG = os.path.dirname(os.path.abspath(__file__)) + '/nicoalert.config'
 
 # test data
 test_stream_info_normal = '<getstreaminfo status="ok"><request_id>lv102363764</request_id><streaminfo><title>&#12304;&#36196;&#20154;&#12305;&#12496;&#12452;&#12488;&#12414;&#12391;&#12510;&#12452;&#12531;&#12463;&#12521;&#12501;&#12488;&#12304;&#12450;&#12459;&#12488;</title><description>&#21021;&#24515;&#32773;&#12391;&#12377;(&#180;&#12539;&#969;&#12539;`)&#33394;&#12293;&#12431;&#12363;&#12425;&#12394;&#12356;&#12371;&#12392;&#12354;&#12426;&#12377;&#12366;&#12390;&#12290;&#12290;&#12290;&#12522;&#12473;&#12490;&#12540;&#12373;&#12435;&#12395;&#21161;&#12369;&#12425;&#12428;&#12390;&#12414;&#12377;&#65367;&#65367;&#65367;&#12424;&#12363;</description><provider_type>community</provider_type><default_community>co1684688</default_community></streaminfo><communityinfo><name>&#36196;&#20154;&#12398;&#12418;&#12385;&#12419;&#12418;&#12385;&#12419;&#37197;&#20449;&#65288; &#12387; &#180; &#969; &#65344; &#65347; &#65289;</name><thumbnail>http://icon.nimg.jp/community/s/168/co1684688.jpg?1341243427</thumbnail></communityinfo><adsense><item><name>&gt;&gt;&#12491;&#12467;&#29983;&#12463;&#12523;&#12540;&#12474;&#12391;&#20182;&#12398;&#30058;&#32068;&#12434;&#25506;&#12377;</name><url>http://live.nicovideo.jp/cruise</url></item></adsense></getstreaminfo>'
@@ -34,15 +34,10 @@ class UnexpectedStatusError(Exception):
 class NicoAlert():
 # class lifecycle
     def __init__(self):
-        logging.config.fileConfig(nicoalert_config)
+        logging.config.fileConfig(NICOALERT_CONFIG)
         self.logger = logging.getLogger("root")
         (self.force_debug_tweet, self.mail, self.password,
             self.target_communities) = self.get_config()
-        if self.force_debug_tweet:
-            print "debug"
-        else:
-            print "not debug"
-
         self.twitter = self.get_twitter()
 
         self.stream_count = 0
@@ -55,7 +50,7 @@ class NicoAlert():
 # utility
     def get_config(self):
         config = ConfigParser.ConfigParser()
-        config.read(nicoalert_config)
+        config.read(NICOALERT_CONFIG)
         if config.get("nicoalert", "force_debug_tweet").lower() == "true":
             force_debug_tweet = True
         else:
@@ -63,20 +58,20 @@ class NicoAlert():
         mail = config.get("nicoalert", "mail")
         password = config.get("nicoalert", "password")
         try:
-            target_communities = config.get("nicoalert", "target_communities").split(',')
+            target_communities = config.get("nicoalert",
+                "target_communities").split(',')
         except ConfigParser.NoOptionError, unused_error:
             target_communities = None
 
-        # self.logger.debug("mail: %s password: *** target_communities: %s" % (mail, target_communities))
+        # self.logger.debug("mail: %s password: *** target_communities: %s" %
+        #    (mail, target_communities))
 
         return force_debug_tweet, mail, password, target_communities
 
 # twitter
-
-# twitter
     def get_twitter(self):
         config = ConfigParser.ConfigParser()
-        config.read(nicoalert_config)
+        config.read(NICOALERT_CONFIG)
 
         consumer_key = config.get("twitter", "consumer_key")
         consumer_secret = config.get("twitter", "consumer_secret")
@@ -112,8 +107,6 @@ class NicoAlert():
         t = Timer(5, self.stream_stat)
         t.start()
 
-        return
-
     def stream_stat(self):
         current_datetime = datetime.datetime.now()
         if self.previous_stream_count_datetime is not None:
@@ -125,12 +118,12 @@ class NicoAlert():
         self.previous_stream_count = self.stream_count
         self.schedule_stream_stat_timer()
 
-        return
 # nico
     def get_ticket(self):
         query = {'mail':self.mail, 'password':self.password}
-        res = urllib2.urlopen('https://secure.nicovideo.jp/secure/login?site=nicolive_antenna',
-        urllib.urlencode(query))
+        res = urllib2.urlopen(
+            'https://secure.nicovideo.jp/secure/login?site=nicolive_antenna',
+            urllib.urlencode(query))
 
         # res_data = xml.fromstring(res.read())
         res_data = etree.fromstring(res.read())
@@ -147,7 +140,8 @@ class NicoAlert():
 
     def get_alert_status(self, ticket):
         query = {'ticket':ticket}
-        res = urllib2.urlopen('http://live.nicovideo.jp/api/getalertstatus', urllib.urlencode(query))
+        res = urllib2.urlopen('http://live.nicovideo.jp/api/getalertstatus',
+            urllib.urlencode(query))
 
         res_data = etree.fromstring(res.read())
         # self.logger.debug(etree.tostring(res_data))
@@ -183,7 +177,8 @@ class NicoAlert():
         return communities, host, port, thread
 
     def get_stream_info(self, stream_id):
-        res = urllib2.urlopen('http://live.nicovideo.jp/api/getstreaminfo/lv'+stream_id)
+        res = urllib2.urlopen('http://live.nicovideo.jp/api/getstreaminfo/lv'+
+            stream_id)
         xml = res.read()
         # xml = test_stream_info_normal
         # xml = test_stream_info_no_title
@@ -203,7 +198,6 @@ class NicoAlert():
         #                                  'title': {'value': u'xxxxxxx'}}}}
 
         status = res_data.xpath("//getstreaminfo")[0].attrib["status"]
-        # test
         # status = "fail"
         if status == "ok":
             community_name = res_data.xpath("//getstreaminfo/communityinfo/name")[0].text
@@ -217,50 +211,44 @@ class NicoAlert():
         return community_name, stream_title
 
 # main
-    def tweet_message(self, message):
-        try:
-            self.update_status(message)
-        except Exception, error:
-            self.logger.debug("error in tweet: %s" % error)
-
     def handle_chat(self, value, communities):
         # value = "102351738,官邸前抗議の首都圏反原発連合と 脱原発を…"
         # value = "102373563,co1299695,7169359"
-        # stream_id, community_id, user_id = value.split(',')
         values = value.split(',')
 
         if len(values) == 3:
             # the stream is NOT the official one
             stream_id, community_id, user_id = values
-            # self.logger.debug("stream_id: %s community_id: %s user_id: %s" % (stream_id, community_id, user_id))
+            # self.logger.debug("stream_id: %s community_id: %s user_id: %s" %
+            #     (stream_id, community_id, user_id))
 
             if community_id in communities or self.force_debug_tweet:
                 try:
                     community_name, stream_title = self.get_stream_info(stream_id)
                 except UnexpectedStatusError, error:
                     self.logger.debug(error)
-                # except:
-                #     self.logger.debug("?")
                 else:
                     stream_url = "http://live.nicovideo.jp/watch/lv" + stream_id
-                    message = "「%s」で「%s」が放送開始しました。" % (community_name.encode('UTF-8'), stream_title.encode('UTF-8'))
+                    message = "「%s」で「%s」が放送開始しました。" % (
+                        community_name.encode('UTF-8'),
+                        stream_title.encode('UTF-8'))
                     self.logger.debug(message + stream_url)
-                    self.tweet_message(message + stream_url)
+                    self.update_status(message + stream_url)
                 if self.force_debug_tweet:
                     os.sys.exit()
 
             else:
-                # self.logger.debug("communityid %s is not target community." % community_id)
+                # self.logger.debug("communityid %s is not target community."
+                #     % community_id)
                 pass
-
-        return
 
     def go(self):
         ticket = self.get_ticket()
         communities, host, port, thread = self.get_alert_status(ticket)
 
         if self.target_communities is None:
-            self.logger.debug("target communities is not specified, so use my communities in my account.")
+            self.logger.debug("target communities is not specified, "
+                "so use my communities in my account.")
             self.target_communities = communities
         self.logger.debug("target communities: %s" % self.target_communities)
 
@@ -268,7 +256,8 @@ class NicoAlert():
         # self.schedule_stream_stat_timer()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((host, port))
-        sock.sendall(('<thread thread="%s" version="20061206" res_form="-1"/>'+chr(0)) % thread)
+        sock.sendall(('<thread thread="%s" version="20061206" res_form="-1"/>'
+            +chr(0)) % thread)
 
         msg = ""
         while True :
@@ -302,7 +291,6 @@ class NicoAlert():
                         if chat:
                             # self.logger.debug(etree.tostring(chat[0]))
                             value = chat[0].text
-                            # self.logger.debug("---------- ---------- ---------")
                             self.logger.debug(value)
                             self.handle_chat(value, self.target_communities)
                             self.stream_count += 1

@@ -1,27 +1,28 @@
 nicoalert
 =============
+![anokoku](https://dl.dropboxusercontent.com/u/444711/github.com/honishi/nicoalert/ankoku.jpeg)
 
 niconama alert for twitter
 
-how to use
+sample
 -------------
+![tweets](https://dl.dropboxusercontent.com/u/444711/github.com/honishi/nicoalert/tweets.png)
 
-first, install the following packages for lxml.
+required library
+-------------
+1. `sudo apt-get install libxml2-dev`
+2. `sudo apt-get install libxslt1-dev`
 
-1. sudo apt-get install libxml2-dev
-2. sudo apt-get install libxslt1-dev 
+setup
+-------------
+1. `git submodule update --init`
+2. `virtualenv --distribute venv`
+3. `source ./venv/bin/activate`
+4. `pip install -r requirements.txt`
+5. `copy nicoalert.config.sample nicoalert.config` then edit
+6. `./nicoalert.sh start` and `./nicoalert.sh stop`
 
-then, install nicoalert.
-
-1. copy nicoalert.config.sample to nicoalert.config, then edit
-2. copy twitter.config.sample to twitter.config, then edit
-3. git submodule update --init
-4. virtualenv --distribute venv
-5. source ./venv/bin/activate
-6. pip install -r requirements.txt
-7. kick ./nicoalert start
-
-example crontab
+monitoring example using crontab
 -------------
 
 	# monitoring nicoalert
@@ -30,7 +31,7 @@ example crontab
 license
 -------------
 
-copyright &copy; 2012 honishi, hiroyuki onishi.
+copyright &copy; 2012- honishi, hiroyuki onishi.
 
 distributed under the [MIT license][mit].
 [mit]: http://www.opensource.org/licenses/mit-license.php

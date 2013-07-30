@@ -12,25 +12,19 @@ start() {
   if [ 0 -lt $(pgrep -f "${pgrep_target}" | wc -l) ]
   then
     echo "already started."
-    RETVAL=2
   else
     # echo "will start"
     nohup ${program} >> ${logfile} 2>&1 &
-    RETVAL=${?}
   fi
-  return ${RETVAL}
 }
 
 stop() {
   pkill -f "${pgrep_target}"
-  RETVAL=${?}
   echo "killed." >> ${logfile}
-  return ${RETVAL}
 }
 
 oneshot() {
   ${program}
-  return $?
 }
 
 monitor() {
@@ -64,8 +58,6 @@ switch() {
     rm ${target}
     ln -s ./${target}.${1} ./${target}
   done
-  
-  return 0
 }
 
 source ${pyenv}
@@ -97,8 +89,5 @@ case "${1}" in
     ;;
   *)
     echo "Usage: ${0} {start|stop|restart|oneshot|monitor|switch}"
-    RETVAL=2
+    exit 1
 esac
-
-exit ${RETVAL}
-
