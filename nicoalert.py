@@ -4,6 +4,7 @@
 # reference; http://d.hatena.ne.jp/miettal/20111229/1325175229
 
 import os
+import sys
 import ConfigParser
 import logging
 import logging.config 
@@ -24,7 +25,7 @@ test_stream_info_no_title = '<getstreaminfo status="ok"><request_id>lv102363769<
 
 # 
 class UnexpectedStatusError(Exception):
-    def __init__(self, status):
+    def __init__(self, status="n/a"):
         self.status = status
 
     def __str__(self):
@@ -161,7 +162,7 @@ class NicoAlert():
         #                    'user_sex': {'value': '1'}}}
         # if res_data.getalertstatus.status != 'ok' :
         if status != 'ok' :
-            raise NICOAlertAuthorizeError
+            raise UnexpectedStatusError(status)
 
         # create mycommunities
         communities = []
@@ -244,7 +245,12 @@ class NicoAlert():
 
     def go(self):
         ticket = self.get_ticket()
-        communities, host, port, thread = self.get_alert_status(ticket)
+        try:
+            communities, host, port, thread = self.get_alert_status(ticket)
+        except Exception, e:
+            self.logger.error("caught exception at get alert status: %s" % e)
+            self.logger.debug("exit.")
+            sys.exit()
 
         if self.target_communities is None:
             self.logger.debug("target communities is not specified, "
