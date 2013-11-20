@@ -48,10 +48,10 @@ class NicoAlert():
              self.access_key[community], self.access_secret[community]) = (
                 self.get_twitter_credentials(community))
             self.logger.debug("community: " + community)
-            self.logger.debug("consumer_key: " + self.consumer_key[community] +
-                              "consumer_secret: ***")
-            self.logger.debug("access_key: " + self.access_key[community] +
-                              "access_secret: ***")
+            self.logger.debug(
+                "consumer_key: %s consumer_secret: ***" % self.consumer_key[community])
+            self.logger.debug(
+                "access_key: %s access_secret: ***" % self.access_key[community])
 
         self.stream_count = 0
         self.previous_stream_count = 0
