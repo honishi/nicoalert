@@ -33,9 +33,25 @@ class NicoAlert():
     def __init__(self):
         logging.config.fileConfig(NICOALERT_CONFIG)
         self.logger = logging.getLogger("root")
+
         (self.force_debug_tweet, self.mail, self.password,
             self.target_communities) = self.get_config()
-        self.twitter = self.get_twitter()
+        self.logger.debug("mail: %s password: *** target_communities: %s" % (
+            self.mail, self.target_communities))
+
+        self.consumer_key = {}
+        self.consumer_secret = {}
+        self.access_key = {}
+        self.access_secret = {}
+        for community in self.target_communities:
+            (self.consumer_key[community], self.consumer_secret[community],
+             self.access_key[community], self.access_secret[community]) = (
+                self.get_twitter_credentials(community))
+            self.logger.debug("community: " + community)
+            self.logger.debug("consumer_key: " + self.consumer_key[community] +
+                              "consumer_secret: ***")
+            self.logger.debug("access_key: " + self.access_key[community] +
+                              "access_secret: ***")
 
         self.stream_count = 0
         self.previous_stream_count = 0
@@ -55,50 +71,33 @@ class NicoAlert():
         mail = config.get("nicoalert", "mail")
         password = config.get("nicoalert", "password")
         try:
-            target_communities = config.get(
-                "nicoalert", "target_communities").split(',')
+            target_communities = config.get("nicoalert", "target_communities").split(',')
         except ConfigParser.NoOptionError, unused_error:
             target_communities = None
 
-        # self.logger.debug("mail: %s password: *** target_communities: %s" %
-        #    (mail, target_communities))
-
         return force_debug_tweet, mail, password, target_communities
 
-# twitter
-    def get_twitter(self):
+    def get_twitter_credentials(self, community):
         config = ConfigParser.ConfigParser()
         config.read(NICOALERT_CONFIG)
+        section = "twitter-" + community
 
-        consumer_key = config.get("twitter", "consumer_key")
-        consumer_secret = config.get("twitter", "consumer_secret")
-        access_key = config.get("twitter", "access_key")
-        access_secret = config.get("twitter", "access_secret")
+        consumer_key = config.get(section, "consumer_key")
+        consumer_secret = config.get(section, "consumer_secret")
+        access_key = config.get(section, "access_key")
+        access_secret = config.get(section, "access_secret")
 
-        self.logger.debug(
-            "consumer_key: %s consumer_secret: *** access_key: %s access_secret: ***" %
-            (consumer_key, access_key))
+        return consumer_key, consumer_secret, access_key, access_secret
 
-        auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-        auth.set_access_token(access_key, access_secret)
-
-        return tweepy.API(auth)
-
-    def update_status(self, status):
+# twitter
+    def update_status(self, community, status):
+        auth = tweepy.OAuthHandler(self.consumer_key[community], self.consumer_secret[community])
+        auth.set_access_token(self.access_key[community], self.access_secret[community])
         try:
-            self.twitter.update_status(status)
+            tweepy.API(auth).update_status(status)
         except tweepy.error.TweepError, error:
             print u'error in post.'
             print error
-
-    def remove_all(self):
-        for status in tweepy.Cursor(self.twitter.user_timeline).items(1000):
-            try:
-                self.twitter.destroy_status(status.id)
-            except tweepy.error.TweepError, error:
-                print u'error in post destroy'
-                print error
-            # sys.stdout.flush()
 
     def schedule_stream_stat_timer(self):
         t = Timer(5, self.stream_stat)
@@ -231,13 +230,13 @@ class NicoAlert():
                         community_name.encode('UTF-8'),
                         stream_title.encode('UTF-8'))
                     self.logger.debug(message + stream_url)
-                    self.update_status(message + stream_url)
+                    if self.force_debug_tweet:
+                        community_id = communities[0]
+                    self.update_status(community_id, message + stream_url)
                 if self.force_debug_tweet:
                     os.sys.exit()
-
             else:
-                # self.logger.debug("communityid %s is not target community."
-                #     % community_id)
+                # self.logger.debug("communityid %s is not target community." % community_id)
                 pass
 
     def go(self):
@@ -286,7 +285,7 @@ class NicoAlert():
                         # 'thread'
                         thread = res_data.xpath("//tread")
                         if thread:
-                            self.logger.debug("番組通知の受信を開始しました．")
+                            self.logger.debug("started receiving stream info.")
 
                         # 'chat'
                         chat = res_data.xpath("//chat")
@@ -297,7 +296,7 @@ class NicoAlert():
                             self.handle_chat(value, self.target_communities)
                             self.stream_count += 1
                     except KeyError:
-                        self.logger.debug("その他のデータを受信しました．")
+                        self.logger.debug("received unrecognized data.")
                     msg = ""
                 else:
                     msg += ch
