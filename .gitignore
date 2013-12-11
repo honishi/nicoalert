@@ -1,6 +1,9 @@
 venv
 *.pyc
-log/*.log
+
+log/*.log*
+log/nohup.out
+
 nicoalert.config*
 !nicoalert.config.sample
 nicoalert.env*

@@ -4,6 +4,7 @@ basedir=$(cd $(dirname $0);pwd)
 pyenv=${basedir}/venv/bin/activate
 program=${basedir}/nicoalert.py
 logfile=${basedir}/log/nicoalert.log
+nohupfile=${basedir}/log/nohup.out
 pgrep_target="python ${program}"
 monitor_threshold=20
 customenv=${basedir}/nicoalert.env
@@ -13,8 +14,7 @@ start() {
   then
     echo "already started."
   else
-    # echo "will start"
-    nohup ${program} >> ${logfile} 2>&1 &
+    nohup ${program} >> ${nohupfile} 2>&1 &
   fi
 }
 
@@ -60,6 +60,7 @@ switch() {
   done
 }
 
+cd ${basedir}
 source ${pyenv}
 
 if [ -e ${customenv} ]; then
