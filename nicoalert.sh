@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 basedir=$(cd $(dirname $0);pwd)
 pyenv=${basedir}/venv/bin/activate
 program=${basedir}/nicoalert.py
@@ -19,7 +21,7 @@ start() {
 }
 
 stop() {
-  pkill -f "${pgrep_target}"
+  pkill -f "${pgrep_target}" || true
   echo "killed." >> ${logfile}
 }
 
@@ -30,17 +32,22 @@ oneshot() {
 monitor() {
   echo $(date) monitor start
 
-  last_modified=$(date -r ${logfile} +%s)
-  # last_modified=0
-  current=$(date +%s)
-  # echo $last_modified
-  # echo $current
-
-  if [ $((${last_modified} + ${monitor_threshold})) -lt ${current} ]
-  then
-    echo $(date) "it seems that the file ${logfile} is not updated in ${monitor_threshold} seconds, so try to restart."
+  if [ ! -e ${logfile} ]; then
+    echo $(date) "log file ${logfile} does not exist."
+    echo $(date) "trying to start application."
     stop
     start
+  else
+    last_modified=$(date -r ${logfile} +%s)
+    current=$(date +%s)
+
+    if [ $((${last_modified} + ${monitor_threshold})) -lt ${current} ]
+    then
+      echo $(date) "log file ${logfile} has not been updated for ${monitor_threshold} seconds."
+      echo $(date) "trying to restart application."
+      stop
+      start
+    fi
   fi
 
   echo $(date) monitor end
