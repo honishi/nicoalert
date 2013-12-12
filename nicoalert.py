@@ -36,7 +36,7 @@ class NicoAlert():
 
         (self.force_debug_tweet, self.mail, self.password,
             self.target_communities) = self.get_config()
-        self.logger.debug("mail: %s password: *** target_communities: %s" % (
+        self.logger.info("mail: %s password: *** target_communities: %s" % (
             self.mail, self.target_communities))
 
         self.consumer_key = {}
@@ -47,10 +47,10 @@ class NicoAlert():
             (self.consumer_key[community], self.consumer_secret[community],
              self.access_key[community], self.access_secret[community]) = (
                 self.get_twitter_credentials(community))
-            self.logger.debug("community: " + community)
-            self.logger.debug(
+            self.logger.info("community: " + community)
+            self.logger.info(
                 "consumer_key: %s consumer_secret: ***" % self.consumer_key[community])
-            self.logger.debug(
+            self.logger.info(
                 "access_key: %s access_secret: ***" % self.access_key[community])
 
         self.stream_count = 0
@@ -223,13 +223,13 @@ class NicoAlert():
                 try:
                     community_name, stream_title = self.get_stream_info(stream_id)
                 except UnexpectedStatusError, error:
-                    self.logger.debug(error)
+                    self.logger.error(error)
                 else:
                     stream_url = "http://live.nicovideo.jp/watch/lv" + stream_id
                     message = "「%s」で「%s」が放送開始しました。" % (
                         community_name.encode('UTF-8'),
                         stream_title.encode('UTF-8'))
-                    self.logger.debug(message + stream_url)
+                    self.logger.info(message + stream_url)
                     if self.force_debug_tweet:
                         community_id = communities[0]
                     self.update_status(community_id, message + stream_url)
@@ -245,14 +245,14 @@ class NicoAlert():
             communities, host, port, thread = self.get_alert_status(ticket)
         except Exception, e:
             self.logger.error("caught exception at get alert status: %s" % e)
-            self.logger.debug("exit.")
+            self.logger.error("exit.")
             sys.exit()
 
         if self.target_communities is None:
-            self.logger.debug(
+            self.logger.warning(
                 "target communities is not specified, so use my communities in my account.")
             self.target_communities = communities
-        self.logger.debug("target communities: %s" % self.target_communities)
+        self.logger.info("target communities: %s" % self.target_communities)
 
         # main loop
         # self.schedule_stream_stat_timer()
@@ -283,16 +283,16 @@ class NicoAlert():
 
                     try:
                         # 'thread'
-                        thread = res_data.xpath("//tread")
+                        thread = res_data.xpath("//thread")
                         if thread:
-                            self.logger.debug("started receiving stream info.")
+                            self.logger.info("started receiving stream info.")
 
                         # 'chat'
                         chat = res_data.xpath("//chat")
                         if chat:
                             # self.logger.debug(etree.tostring(chat[0]))
                             value = chat[0].text
-                            self.logger.debug(value)
+                            self.logger.info("received alert: %s" % value)
                             self.handle_chat(value, self.target_communities)
                             self.stream_count += 1
                     except KeyError:
