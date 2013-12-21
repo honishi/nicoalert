@@ -37,7 +37,7 @@ class NicoAlert():
 
         self.force_debug_tweet, self.mail, self.password = self.get_basic_config()
         self.logger.info("force_debug_tweet: %s mail: %s password: xxxxx" %
-            (self.force_debug_tweet, self.mail))
+                         (self.force_debug_tweet, self.mail))
 
         self.target_communities = []
         self.consumer_key = {}
@@ -45,8 +45,8 @@ class NicoAlert():
         self.access_key = {}
         self.access_secret = {}
 
-        for (community, consumer_key, consumer_secret, access_key, access_secret
-                ) in self.get_community_config():
+        for (community, consumer_key, consumer_secret, access_key,
+                access_secret) in self.get_community_config():
             self.target_communities.append(community)
             self.consumer_key[self.target_communities[-1]] = consumer_key
             self.consumer_secret[self.target_communities[-1]] = consumer_secret
@@ -55,9 +55,9 @@ class NicoAlert():
 
             self.logger.info("community: %s" % self.target_communities[-1])
             self.logger.info("consumer_key: %s consumer_secret: xxxxx" %
-                self.consumer_key[self.target_communities[-1]])
+                             self.consumer_key[self.target_communities[-1]])
             self.logger.info("access_key: %s access_secret: xxxxx" %
-                self.access_key[self.target_communities[-1]])
+                             self.access_key[self.target_communities[-1]])
 
         self.stream_count = 0
         self.previous_stream_count = 0
