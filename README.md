@@ -19,6 +19,7 @@ setup
 $ git submodule update --init
 $ virtualenv --distribute venv
 $ source ./venv/bin/activate
+$ pip install http://sourceforge.net/projects/pychecker/files/pychecker/0.8.19/pychecker-0.8.19.tar.gz/download
 $ pip install -r requirements.txt
 $ cp nicoalert.config.sample nicoalert.config
 $ vi nicoalert.config

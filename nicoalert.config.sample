@@ -1,17 +1,15 @@
 [nicoalert]
-force_debug_tweet = false
+# force_debug_tweet = true
 mail = sample@example.com
 password = mypassword
-# comma separated community list
-target_communities = co12345,co67890
 
-[twitter-co12345]
+[community-co12345]
 consumer_key = xxx
 consumer_secret = xxx
 access_key = xxx
 access_secret = xxx
 
-[twitter-co67890]
+[community-co67890]
 consumer_key = yyy
 consumer_secret = yyy
 access_key = yyy

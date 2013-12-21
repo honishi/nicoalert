@@ -8,6 +8,7 @@ import sys
 import ConfigParser
 import logging
 import logging.config
+import re
 import datetime
 import urllib
 import urllib2
@@ -29,29 +30,34 @@ class UnexpectedStatusError(Exception):
 
 
 class NicoAlert():
-# class lifecycle
+# magic methods
     def __init__(self):
         logging.config.fileConfig(NICOALERT_CONFIG)
         self.logger = logging.getLogger("root")
 
-        (self.force_debug_tweet, self.mail, self.password,
-            self.target_communities) = self.get_config()
-        self.logger.info("mail: %s password: *** target_communities: %s" % (
-            self.mail, self.target_communities))
+        self.force_debug_tweet, self.mail, self.password = self.get_basic_config()
+        self.logger.info("force_debug_tweet: %s mail: %s password: xxxxx" %
+            (self.force_debug_tweet, self.mail))
 
+        self.target_communities = []
         self.consumer_key = {}
         self.consumer_secret = {}
         self.access_key = {}
         self.access_secret = {}
-        for community in self.target_communities:
-            (self.consumer_key[community], self.consumer_secret[community],
-             self.access_key[community], self.access_secret[community]) = (
-                self.get_twitter_credentials(community))
-            self.logger.info("community: " + community)
-            self.logger.info(
-                "consumer_key: %s consumer_secret: ***" % self.consumer_key[community])
-            self.logger.info(
-                "access_key: %s access_secret: ***" % self.access_key[community])
+
+        for (community, consumer_key, consumer_secret, access_key, access_secret
+                ) in self.get_community_config():
+            self.target_communities.append(community)
+            self.consumer_key[self.target_communities[-1]] = consumer_key
+            self.consumer_secret[self.target_communities[-1]] = consumer_secret
+            self.access_key[self.target_communities[-1]] = access_key
+            self.access_secret[self.target_communities[-1]] = access_secret
+
+            self.logger.info("community: %s" % self.target_communities[-1])
+            self.logger.info("consumer_key: %s consumer_secret: xxxxx" %
+                self.consumer_key[self.target_communities[-1]])
+            self.logger.info("access_key: %s access_secret: xxxxx" %
+                self.access_key[self.target_communities[-1]])
 
         self.stream_count = 0
         self.previous_stream_count = 0
@@ -60,61 +66,142 @@ class NicoAlert():
     def __del__(self):
         pass
 
-# utility
-    def get_config(self):
+    # config utility
+    def get_basic_config(self):
         config = ConfigParser.ConfigParser()
         config.read(NICOALERT_CONFIG)
-        if config.get("nicoalert", "force_debug_tweet").lower() == "true":
-            force_debug_tweet = True
-        else:
+
+        section = "nicoalert"
+
+        try:
+            force_debug_tweet = config.get(section, "force_debug_tweet")
+            if force_debug_tweet.lower() == "true":
+                force_debug_tweet = True
+            else:
+                force_debug_tweet = False
+        except ConfigParser.NoOptionError, unused_e:
             force_debug_tweet = False
-        mail = config.get("nicoalert", "mail")
-        password = config.get("nicoalert", "password")
-        try:
-            target_communities = config.get("nicoalert", "target_communities").split(',')
-        except ConfigParser.NoOptionError, unused_error:
-            target_communities = None
 
-        return force_debug_tweet, mail, password, target_communities
+        mail = config.get(section, "mail")
+        password = config.get(section, "password")
 
-    def get_twitter_credentials(self, community):
+        return force_debug_tweet, mail, password
+
+    def get_community_config(self):
+        result = []
+
         config = ConfigParser.ConfigParser()
         config.read(NICOALERT_CONFIG)
-        section = "twitter-" + community
 
-        consumer_key = config.get(section, "consumer_key")
-        consumer_secret = config.get(section, "consumer_secret")
-        access_key = config.get(section, "access_key")
-        access_secret = config.get(section, "access_secret")
+        for section in config.sections():
+            matched = re.match(r'community-(.+)', section)
+            if matched:
+                community = matched.group(1)
+                consumer_key = config.get(section, "consumer_key")
+                consumer_secret = config.get(section, "consumer_secret")
+                access_key = config.get(section, "access_key")
+                access_secret = config.get(section, "access_secret")
+                result.append(
+                    (community, consumer_key, consumer_secret, access_key, access_secret))
 
-        return consumer_key, consumer_secret, access_key, access_secret
+        return result
 
-# twitter
-    def update_status(self, community, status):
-        auth = tweepy.OAuthHandler(self.consumer_key[community], self.consumer_secret[community])
-        auth.set_access_token(self.access_key[community], self.access_secret[community])
+# public methods
+    def start_listening_alert(self):
+        ticket = self.get_ticket()
         try:
-            tweepy.API(auth).update_status(status)
-        except tweepy.error.TweepError, error:
-            print u'error in post.'
-            print error
+            communities, host, port, thread = self.get_alert_status(ticket)
+        except Exception, e:
+            self.logger.error("caught exception at get alert status: %s" % e)
+            self.logger.error("exit.")
+            sys.exit()
 
-    def schedule_stream_stat_timer(self):
-        t = Timer(5, self.stream_stat)
-        t.start()
+        if self.target_communities is None:
+            self.logger.warning(
+                "target communities is not specified, so use my communities in my account.")
+            self.target_communities = communities
+        self.logger.info("target communities: %s" % self.target_communities)
 
-    def stream_stat(self):
-        current_datetime = datetime.datetime.now()
-        if self.previous_stream_count_datetime is not None:
-            seconds = (current_datetime-self.previous_stream_count_datetime).seconds
-            stream_per_sec = ((float)(self.stream_count - self.previous_stream_count)) / seconds
-            self.logger.debug("%.1f streams/sec (interval: %s sec)" % (stream_per_sec, seconds))
+        # main loop
+        # self.schedule_stream_stat_timer()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+        sock.sendall(('<thread thread="%s" version="20061206" res_form="-1"/>' + chr(0)) % thread)
 
-        self.previous_stream_count_datetime = current_datetime
-        self.previous_stream_count = self.stream_count
-        self.schedule_stream_stat_timer()
+        msg = ""
+        while True:
+            rcvmsg = sock.recv(1024)
+            for ch in rcvmsg:
+                if ch == chr(0):
+                    # res_data = xml.fromstring(msg)
+                    res_data = etree.fromstring(msg)
+                    # sample response
+                    #{'thread': {'last_res': {'value': '14238750'},
+                    #            'resultcode': {'value': '0'},
+                    #            'revision': {'value': '1'},
+                    #            'server_time': {'value': '1325054571'},
+                    #            'thread': {'value': '1000000015'},
+                    #            'ticket': {'value': '0x9639240'}}}
+                    #{'chat': {'date': {'value': '1325054572'},
+                    #          'no': {'value': '14238751'},
+                    #          'premium': {'value': '2'},
+                    #          'thread': {'value': '1000000015'},
+                    #          'user_id': {'value': '394'},
+                    #          'value': '75844139,co1140439,13064030'}}
 
-# nico
+                    try:
+                        # 'thread'
+                        thread = res_data.xpath("//thread")
+                        if thread:
+                            self.logger.info("started receiving stream info.")
+
+                        # 'chat'
+                        chat = res_data.xpath("//chat")
+                        if chat:
+                            # self.logger.debug(etree.tostring(chat[0]))
+                            value = chat[0].text
+                            self.logger.info("received alert: %s" % value)
+                            self.handle_chat(value, self.target_communities)
+                            self.stream_count += 1
+                    except KeyError:
+                        self.logger.debug("received unrecognized data.")
+                    msg = ""
+                else:
+                    msg += ch
+
+    # alert handler
+    def handle_chat(self, value, communities):
+        # value = "102351738,官邸前抗議の首都圏反原発連合と 脱原発を…"
+        # value = "102373563,co1299695,7169359"
+        values = value.split(',')
+
+        if len(values) == 3:
+            # the stream is NOT the official one
+            stream_id, community_id, user_id = values
+            # self.logger.debug("stream_id: %s community_id: %s user_id: %s" %
+            #     (stream_id, community_id, user_id))
+
+            if community_id in communities or self.force_debug_tweet:
+                try:
+                    community_name, stream_title = self.get_stream_info(stream_id)
+                except UnexpectedStatusError, error:
+                    self.logger.error(error)
+                else:
+                    stream_url = "http://live.nicovideo.jp/watch/lv" + stream_id
+                    message = "【放送開始】%s（%s）%s" % (
+                        stream_title.encode('UTF-8'),
+                        community_name.encode('UTF-8'), stream_url)
+                    self.logger.info(message)
+                    if self.force_debug_tweet:
+                        community_id = communities[0]
+                    self.update_status(community_id, message)
+                if self.force_debug_tweet:
+                    os.sys.exit()
+            else:
+                # self.logger.debug("communityid %s is not target community." % community_id)
+                pass
+
+# private methods, niconico
     def get_ticket(self):
         query = {'mail': self.mail, 'password': self.password}
         res = urllib2.urlopen(
@@ -207,100 +294,32 @@ class NicoAlert():
 
         return community_name, stream_title
 
-# main
-    def handle_chat(self, value, communities):
-        # value = "102351738,官邸前抗議の首都圏反原発連合と 脱原発を…"
-        # value = "102373563,co1299695,7169359"
-        values = value.split(',')
-
-        if len(values) == 3:
-            # the stream is NOT the official one
-            stream_id, community_id, user_id = values
-            # self.logger.debug("stream_id: %s community_id: %s user_id: %s" %
-            #     (stream_id, community_id, user_id))
-
-            if community_id in communities or self.force_debug_tweet:
-                try:
-                    community_name, stream_title = self.get_stream_info(stream_id)
-                except UnexpectedStatusError, error:
-                    self.logger.error(error)
-                else:
-                    stream_url = "http://live.nicovideo.jp/watch/lv" + stream_id
-                    message = "「%s」で「%s」が放送開始しました。" % (
-                        community_name.encode('UTF-8'),
-                        stream_title.encode('UTF-8'))
-                    self.logger.info(message + stream_url)
-                    if self.force_debug_tweet:
-                        community_id = communities[0]
-                    self.update_status(community_id, message + stream_url)
-                if self.force_debug_tweet:
-                    os.sys.exit()
-            else:
-                # self.logger.debug("communityid %s is not target community." % community_id)
-                pass
-
-    def go(self):
-        ticket = self.get_ticket()
+# private methods, twitter
+    def update_status(self, community, status):
+        auth = tweepy.OAuthHandler(self.consumer_key[community], self.consumer_secret[community])
+        auth.set_access_token(self.access_key[community], self.access_secret[community])
         try:
-            communities, host, port, thread = self.get_alert_status(ticket)
-        except Exception, e:
-            self.logger.error("caught exception at get alert status: %s" % e)
-            self.logger.error("exit.")
-            sys.exit()
+            tweepy.API(auth).update_status(status)
+        except tweepy.error.TweepError, error:
+            print u'error in post.'
+            print error
 
-        if self.target_communities is None:
-            self.logger.warning(
-                "target communities is not specified, so use my communities in my account.")
-            self.target_communities = communities
-        self.logger.info("target communities: %s" % self.target_communities)
+    def schedule_stream_stat_timer(self):
+        t = Timer(5, self.stream_stat)
+        t.start()
 
-        # main loop
-        # self.schedule_stream_stat_timer()
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host, port))
-        sock.sendall(('<thread thread="%s" version="20061206" res_form="-1"/>' + chr(0)) % thread)
+    def stream_stat(self):
+        current_datetime = datetime.datetime.now()
+        if self.previous_stream_count_datetime is not None:
+            seconds = (current_datetime-self.previous_stream_count_datetime).seconds
+            stream_per_sec = ((float)(self.stream_count - self.previous_stream_count)) / seconds
+            self.logger.debug("%.1f streams/sec (interval: %s sec)" % (stream_per_sec, seconds))
 
-        msg = ""
-        while True:
-            rcvmsg = sock.recv(1024)
-            for ch in rcvmsg:
-                if ch == chr(0):
-                    # res_data = xml.fromstring(msg)
-                    res_data = etree.fromstring(msg)
-                    # sample response
-                    #{'thread': {'last_res': {'value': '14238750'},
-                    #            'resultcode': {'value': '0'},
-                    #            'revision': {'value': '1'},
-                    #            'server_time': {'value': '1325054571'},
-                    #            'thread': {'value': '1000000015'},
-                    #            'ticket': {'value': '0x9639240'}}}
-                    #{'chat': {'date': {'value': '1325054572'},
-                    #          'no': {'value': '14238751'},
-                    #          'premium': {'value': '2'},
-                    #          'thread': {'value': '1000000015'},
-                    #          'user_id': {'value': '394'},
-                    #          'value': '75844139,co1140439,13064030'}}
+        self.previous_stream_count_datetime = current_datetime
+        self.previous_stream_count = self.stream_count
+        self.schedule_stream_stat_timer()
 
-                    try:
-                        # 'thread'
-                        thread = res_data.xpath("//thread")
-                        if thread:
-                            self.logger.info("started receiving stream info.")
-
-                        # 'chat'
-                        chat = res_data.xpath("//chat")
-                        if chat:
-                            # self.logger.debug(etree.tostring(chat[0]))
-                            value = chat[0].text
-                            self.logger.info("received alert: %s" % value)
-                            self.handle_chat(value, self.target_communities)
-                            self.stream_count += 1
-                    except KeyError:
-                        self.logger.debug("received unrecognized data.")
-                    msg = ""
-                else:
-                    msg += ch
 
 if __name__ == "__main__":
     nicoalert = NicoAlert()
-    nicoalert.go()
+    nicoalert.start_listening_alert()
